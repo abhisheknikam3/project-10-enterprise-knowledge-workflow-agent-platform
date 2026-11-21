@@ -263,28 +263,5 @@ CREATE TABLE agent_execution_audit (
 
 ---
 
-## 8. LMS Assessor Submission Text
 
-```text
-Student Name: Abhishek Nikam
-Student Email: abhishek.n@tayanasolutions.com
-Course: n8n Full-Stack Enterprise Automation Engineering
-Project Code: N8N-FIN-PRJ-10
-Project Title: Project 10: Enterprise Knowledge & Workflow Agent Platform
-GitHub Repository: https://github.com/abhisheknikam3/project-10-enterprise-knowledge-workflow-agent-platform
-
-Assessment Deliverables Included:
-1. Project_10_Enterprise_Knowledge_Workflow_Agent_Platform.json:
-   - Full 15-node production-ready workflow with complete node wiring and pre-pinned test execution data.
-   - Dual-intake architecture supporting Manual Trigger and Webhook POST /v1/agent/chat.
-   - Role-Based Access Control (RBAC) session injector supporting EMPLOYEE, MANAGER, and EXECUTIVE roles.
-   - AI Agent Orchestrator with 4 executable enterprise tools: Knowledge RAG, Leave Submission, IT Ticket Creation, and CRM Account Lookup.
-   - Manager Human-in-the-Loop (HITL) approval gate for leave deductions.
-   - Comprehensive audit logging persisting to agent_execution_audit.
-2. schema.sql:
-   - Production PostgreSQL schema with uuid-ossp and vector extensions, 6 tables, role constraints, and complete seed data.
-3. README.md:
-   - Comprehensive technical blueprint, ASCII canvas topology, Mermaid sequence diagrams, database documentation, 5-scenario test matrix, and Evaluator's Secret Defense Guide.
-4. README.pdf:
-   - High-fidelity PDF documentation generated via Playwright.
 ```
