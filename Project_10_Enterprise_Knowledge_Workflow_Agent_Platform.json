@@ -3,75 +3,99 @@
   "nodes": [
     {
       "parameters": {},
-      "id": "e9a10001-0001-4000-8000-000000000001",
+      "id": "15078181-d257-43e5-a680-5d197e2d587f",
       "name": "Manual_Trigger",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        180,
-        240
+        -1456,
+        160
       ]
     },
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "v1/agent/chat",
-        "responseMode": "onReceived",
-        "responseData": "allEntries",
+        "responseMode": "lastNode",
         "options": {}
       },
-      "id": "e9a10001-0002-4000-8000-000000000002",
+      "id": "ff3976bf-544f-4b10-899f-c90b14055cad",
       "name": "Webhook_InboundAgentChat",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        180,
-        420
+        -1456,
+        368
       ],
-      "webhookId": "v1-agent-chat-wh"
+      "webhookId": "project10-agent-chat"
     },
     {
       "parameters": {
-        "jsCode": "// Normalize incoming chat message and stage test scenarios\nconst incoming = $input.item.json || {};\n\nreturn {\n  json: {\n    userId: incoming.userId || \"USER-EMP-4019\",\n    message: incoming.message || \"What is our travel reimbursement policy for domestic flights?\",\n    channel: incoming.channel || \"SLACK_DIRECT\",\n    timestamp: new Date().toISOString(),\n    // Scenario override helper for direct 1-click test evaluation\n    testScenario: incoming.testScenario || null,\n    managerApprovalAction: incoming.managerApprovalAction !== undefined ? incoming.managerApprovalAction : \"APPROVE\"\n  }\n};"
+        "mode": "runOnceForEachItem",
+        "jsCode": "const incoming = $input.item.json || {};\nconst body = incoming.body && typeof incoming.body === 'object' ? incoming.body : incoming;\nreturn { json: {\n  userId: body.userId || 'USER-EMP-4019',\n  message: body.message || 'What is our travel reimbursement policy for domestic flights?',\n  channel: body.channel || 'SLACK_DIRECT',\n  testScenario: body.testScenario || null,\n  managerApprovalAction: body.managerApprovalAction || 'PENDING',\n  timestamp: new Date().toISOString()\n}};"
       },
-      "id": "e9a10001-0003-4000-8000-000000000003",
-      "name": "Code_StageUserChatRequest",
+      "id": "14867182-84f6-4388-92e1-24ce31f25677",
+      "name": "Normalize_Inbound_Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
-        320
+        -1216,
+        240
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Phase 1: Authenticate User & Validate RBAC Role against PostgreSQL Directory\nconst item = $input.item.json;\nconst userId = item.userId;\n\n// Simulated Enterprise User Directory (mirrors PostgreSQL enterprise_users table)\nconst userDirectory = {\n  \"USER-EMP-4019\": {\n    userId: \"USER-EMP-4019\",\n    name: \"Kavita Reddy\",\n    email: \"kavita.r@enterprise.com\",\n    role: \"EMPLOYEE\",\n    department: \"Engineering\",\n    managerEmail: \"vikram.singh@enterprise.com\",\n    annualLeaveBalance: 14\n  },\n  \"USER-EMP-9912\": {\n    userId: \"USER-EMP-9912\",\n    name: \"Rahul Verma\",\n    email: \"rahul.v@enterprise.com\",\n    role: \"EMPLOYEE\",\n    department: \"Operations\",\n    managerEmail: \"vikram.singh@enterprise.com\",\n    annualLeaveBalance: 2\n  },\n  \"USER-MGR-2010\": {\n    userId: \"USER-MGR-2010\",\n    name: \"Vikram Singh\",\n    email: \"vikram.singh@enterprise.com\",\n    role: \"MANAGER\",\n    department: \"Engineering\",\n    managerEmail: \"priya.sharma@enterprise.com\",\n    annualLeaveBalance: 22\n  },\n  \"USER-EXEC-1001\": {\n    userId: \"USER-EXEC-1001\",\n    name: \"Priya Sharma\",\n    email: \"priya.sharma@enterprise.com\",\n    role: \"EXECUTIVE\",\n    department: \"Executive Leadership\",\n    managerEmail: \"board@enterprise.com\",\n    annualLeaveBalance: 30\n  }\n};\n\nconst user = userDirectory[userId] || {\n  userId: userId,\n  name: \"Guest Employee\",\n  email: `${userId.toLowerCase()}@enterprise.com`,\n  role: \"EMPLOYEE\",\n  department: \"General\",\n  managerEmail: \"support@enterprise.com\",\n  annualLeaveBalance: 10\n};\n\n// Define accessible RBAC tiers for Knowledge RAG\nlet allowedTiers = [\"EMPLOYEE\"];\nif (user.role === \"MANAGER\") {\n  allowedTiers = [\"EMPLOYEE\", \"MANAGER\"];\n} else if (user.role === \"EXECUTIVE\") {\n  allowedTiers = [\"EMPLOYEE\", \"MANAGER\", \"EXECUTIVE\"];\n}\n\nreturn {\n  json: {\n    ...item,\n    authenticatedUser: user,\n    rbacContext: {\n      role: user.role,\n      department: user.department,\n      allowedTiers: allowedTiers,\n      sessionToken: `SESSION-SEC-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,\n      verifiedAt: new Date().toISOString()\n    }\n  }\n};"
+        "operation": "executeQuery",
+        "query": "SELECT to_jsonb(u) AS user_row, $1::jsonb AS context\nFROM public.enterprise_users u\nWHERE u.user_id = ($1::jsonb ->> 'userId')\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json) }}"
+        }
       },
-      "id": "e9a10001-0004-4000-8000-000000000004",
+      "id": "6ddebb67-e3a9-468b-82a5-2d08dbfdaf12",
+      "name": "DB01_Get_Enterprise_User",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -976,
+        240
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "g2oiNXpDsEzXYhzU",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const row = $input.item.json || {};\nconst user = row.user_row;\nconst ctx = row.context || {};\nif (!user) {\n  return { json: { ...ctx, authError: `User ${ctx.userId || ''} was not found in enterprise_users`, authenticated: false } };\n}\nconst allowedTiers = user.role === 'EXECUTIVE' ? ['EMPLOYEE','MANAGER','EXECUTIVE'] : user.role === 'MANAGER' ? ['EMPLOYEE','MANAGER'] : ['EMPLOYEE'];\nreturn { json: {\n  ...ctx,\n  authenticated: true,\n  authenticatedUser: { userId:user.user_id, name:user.name, email:user.email, role:user.role, department:user.department, managerEmail:user.manager_email, annualLeaveBalance:user.annual_leave_balance },\n  rbacContext: { role:user.role, department:user.department, allowedTiers, verifiedAt:new Date().toISOString() }\n}};"
+      },
+      "id": "1d5cf097-97d1-41ae-82be-3c4cfa3627f1",
       "name": "Phase1_AuthenticateUserAndRBAC",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        640,
-        320
+        -736,
+        240
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Phase 2: n8n AI Agent Node Orchestrator (Intent Recognition & Tool Decision)\nconst item = $input.item.json;\nconst prompt = (item.message || \"\").toLowerCase();\nconst scenario = item.testScenario;\n\nlet selectedTool = \"QUERY_KNOWLEDGE_BASE\";\nlet intentReasoning = \"\";\n\nif (scenario === \"TC-01\" || prompt.includes(\"travel\") || prompt.includes(\"flight\") || prompt.includes(\"policy\") || prompt.includes(\"reimbursement\") || prompt.includes(\"bonus\") || prompt.includes(\"compensation\")) {\n  selectedTool = \"QUERY_KNOWLEDGE_BASE\";\n  intentReasoning = \"User is requesting company policy or standard operating procedure information. Dispatching RBAC vector search.\";\n} else if (scenario === \"TC-03\" || scenario === \"TC-04\" || prompt.includes(\"leave\") || prompt.includes(\"vacation\") || prompt.includes(\"time off\")) {\n  selectedTool = \"SUBMIT_LEAVE_REQUEST\";\n  intentReasoning = \"User is requesting leave days deduction. Routing to Leave Management and Manager Approval gate.\";\n} else if (scenario === \"TC-05\" || prompt.includes(\"vpn\") || prompt.includes(\"ticket\") || prompt.includes(\"error\") || prompt.includes(\"laptop\") || prompt.includes(\"support\")) {\n  selectedTool = \"CREATE_IT_TICKET\";\n  intentReasoning = \"User reported a technical infrastructure malfunction. Dispatching IT Support Requisition tool.\";\n} else if (prompt.includes(\"crm\") || prompt.includes(\"client\") || prompt.includes(\"contract\") || prompt.includes(\"mrr\") || prompt.includes(\"acme\") || prompt.includes(\"globex\")) {\n  selectedTool = \"LOOKUP_CRM_CLIENT\";\n  intentReasoning = \"User requested customer CRM account health summary. Querying PostgreSQL Client Ledger.\";\n}\n\nreturn {\n  json: {\n    ...item,\n    aiOrchestrator: {\n      model: \"gpt-4o\",\n      selectedTool: selectedTool,\n      intentReasoning: intentReasoning,\n      decidedAt: new Date().toISOString()\n    }\n  }\n};"
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item.json;\nconst p = (item.message || '').toLowerCase();\nlet selectedTool = 'QUERY_KNOWLEDGE_BASE';\nif (item.testScenario === 'TC-03' || item.testScenario === 'TC-04' || /\\b(leave|vacation|time off)\\b/.test(p)) selectedTool='SUBMIT_LEAVE_REQUEST';\nelse if (item.testScenario === 'TC-05' || /\\b(vpn|ticket|error|laptop|support|it issue)\\b/.test(p)) selectedTool='CREATE_IT_TICKET';\nelse if (item.testScenario === 'TC-06' || /\\b(crm|client|contract|mrr|acme|globex)\\b/.test(p)) selectedTool='LOOKUP_CRM_CLIENT';\nreturn {json:{...item, aiOrchestrator:{selectedTool, decidedAt:new Date().toISOString(), model:'deterministic-router'}}};"
       },
-      "id": "e9a10001-0005-4000-8000-000000000005",
-      "name": "Phase2_AIAgentOrchestrator",
+      "id": "037ce4bd-97f4-47ad-a2a0-fc27dcb3526d",
+      "name": "Phase2_Route_Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
-        320
+        -496,
+        240
       ]
     },
     {
       "parameters": {
-        "mode": "rules",
         "rules": {
           "values": [
             {
@@ -79,7 +103,8 @@
                 "options": {
                   "caseSensitive": false,
                   "leftValue": "",
-                  "typeValidation": "strict"
+                  "typeValidation": "strict",
+                  "version": 1
                 },
                 "conditions": [
                   {
@@ -99,7 +124,8 @@
                 "options": {
                   "caseSensitive": false,
                   "leftValue": "",
-                  "typeValidation": "strict"
+                  "typeValidation": "strict",
+                  "version": 1
                 },
                 "conditions": [
                   {
@@ -119,7 +145,8 @@
                 "options": {
                   "caseSensitive": false,
                   "leftValue": "",
-                  "typeValidation": "strict"
+                  "typeValidation": "strict",
+                  "version": 1
                 },
                 "conditions": [
                   {
@@ -139,7 +166,8 @@
                 "options": {
                   "caseSensitive": false,
                   "leftValue": "",
-                  "typeValidation": "strict"
+                  "typeValidation": "strict",
+                  "version": 1
                 },
                 "conditions": [
                   {
@@ -158,111 +186,203 @@
         },
         "options": {}
       },
-      "id": "e9a10001-0006-4000-8000-000000000006",
+      "id": "36ec9d0d-1647-4240-824d-eaef6665386d",
       "name": "Switch_ToolSelectionDecision",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
       "position": [
-        1120,
-        320
+        -256,
+        240
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Phase 3: Tool 1 - RBAC-Grounded Knowledge Vector Search (pgvector Simulation)\nconst item = $input.item.json;\nconst prompt = (item.message || \"\").toLowerCase();\nconst userRole = item.authenticatedUser.role;\nconst allowedTiers = item.rbacContext.allowedTiers;\n\n// Knowledge base chunks mirroring PostgreSQL enterprise_knowledge\nconst knowledgeBase = [\n  {\n    chunkId: \"c1-travel-policy\",\n    documentTitle: \"Corporate Travel Policy 2026\",\n    sectionTitle: \"Domestic Flight Reimbursement\",\n    requiredRoleTier: \"EMPLOYEE\",\n    content: \"Employees traveling on company business are authorized for economy class commercial domestic flights booked at least 14 days in advance. Meals are reimbursed up to $75 USD per diem with valid itemized receipts. Ground transit via Uber/Lyft is covered for airport transfers and client meetings.\",\n    citation: \"Source: SOP-TRAVEL-2026-V2 (Section 4.1)\"\n  },\n  {\n    chunkId: \"c2-exec-comp\",\n    documentTitle: \"Executive Compensation Covenant\",\n    sectionTitle: \"C-Suite Bonus Tiers & Equity Acceleration\",\n    requiredRoleTier: \"EXECUTIVE\",\n    content: \"CONFIDENTIAL RESTRICTED: Executive leadership bonus compensation tiers are evaluated on annual EBITDA benchmarks: Tier 1 (100% target achievement) yields a 45% base bonus multiplier; Tier 2 (125% target) triggers a 75% multiplier with 25% accelerated vesting on Class A preferred equity shares.\",\n    citation: \"Source: EXEC-CONFIDENTIAL-COMP-2026 (Section 9.4)\"\n  },\n  {\n    chunkId: \"c3-vpn-sop\",\n    documentTitle: \"IT Remote Access Standard Operating Procedure\",\n    sectionTitle: \"VPN Client Configuration & Error 789\",\n    requiredRoleTier: \"EMPLOYEE\",\n    content: \"Remote staff must authenticate via Enterprise GlobalProtect VPN using FIDO2 keys. Error 789 indicates an IPsec security negotiation timeout. Users should flush DNS via `ipconfig /flushdns` or submit an urgent IT ticket.\",\n    citation: \"Source: SOP-SEC-NET-789 (Section 2.3)\"\n  }\n];\n\n// Determine matching document\nlet targetChunk = null;\nif (prompt.includes(\"bonus\") || prompt.includes(\"compensation\") || prompt.includes(\"equity\")) {\n  targetChunk = knowledgeBase.find(c => c.chunkId === \"c2-exec-comp\");\n} else if (prompt.includes(\"vpn\") || prompt.includes(\"789\")) {\n  targetChunk = knowledgeBase.find(c => c.chunkId === \"c3-vpn-sop\");\n} else {\n  targetChunk = knowledgeBase.find(c => c.chunkId === \"c1-travel-policy\");\n}\n\nlet toolResult = {};\nif (targetChunk) {\n  // Enforce strict RBAC Gate\n  const isAuthorized = allowedTiers.includes(targetChunk.requiredRoleTier);\n  if (!isAuthorized) {\n    toolResult = {\n      rbacStatus: \"ACCESS_DENIED_INSUFFICIENT_CLEARANCE\",\n      requiredTier: targetChunk.requiredRoleTier,\n      userRole: userRole,\n      groundedAnswer: `Security Alert: Access to \"${targetChunk.documentTitle}\" requires [${targetChunk.requiredRoleTier}] clearance. Your current verified role is [${userRole}]. Access has been denied and logged to the security audit trail.`,\n      citation: \"N/A - RESTRICTED_CONFIDENTIAL\"\n    };\n  } else {\n    toolResult = {\n      rbacStatus: \"ACCESS_GRANTED_AUTHORIZED\",\n      documentTitle: targetChunk.documentTitle,\n      sectionTitle: targetChunk.sectionTitle,\n      requiredTier: targetChunk.requiredRoleTier,\n      content: targetChunk.content,\n      citation: targetChunk.citation,\n      groundedAnswer: `${targetChunk.content}\\n\\n**Verified Reference:** ${targetChunk.citation}`\n    };\n  }\n}\n\nreturn {\n  json: {\n    ...item,\n    toolExecution: {\n      toolName: \"query_knowledge_base\",\n      result: toolResult,\n      executedAt: new Date().toISOString()\n    }\n  }\n};"
-      },
-      "id": "e9a10001-0007-4000-8000-000000000007",
-      "name": "Phase3_Tool_KnowledgeRAG",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1360,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Phase 4: Tool 2 - Leave Request Submission & Balance Check\nconst item = $input.item.json;\nconst user = item.authenticatedUser;\nconst prompt = item.message || \"\";\n\n// Extract requested days from message or scenario defaults\nlet requestedDays = 3;\nconst daysMatch = prompt.match(/(\\d+)\\s*(day|days)/i);\nif (daysMatch) {\n  requestedDays = parseInt(daysMatch[1], 10);\n}\n\nconst currentBalance = user.annualLeaveBalance;\nconst hasSufficientBalance = currentBalance >= requestedDays;\n\nreturn {\n  json: {\n    ...item,\n    leaveCalculation: {\n      requestedDays: requestedDays,\n      currentBalance: currentBalance,\n      hasSufficientBalance: hasSufficientBalance,\n      startDate: \"2026-11-23\",\n      endDate: \"2026-11-25\",\n      reason: \"Medical / Annual Personal Leave Request\"\n    }\n  }\n};"
-      },
-      "id": "e9a10001-0008-4000-8000-000000000008",
-      "name": "Phase4_Tool_LeaveSubmission",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1360,
-        260
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "boolean": [
-            {
-              "value1": "={{ $json.leaveCalculation.hasSufficientBalance }}",
-              "value2": true
-            }
-          ]
+        "operation": "executeQuery",
+        "query": "WITH c AS (SELECT $1::jsonb AS j)\nSELECT c.j AS context, to_jsonb(k) AS knowledge_row\nFROM c\nLEFT JOIN LATERAL (\n  SELECT chunk_id, document_title, section_title, required_role_tier, chunk_content\n  FROM public.enterprise_knowledge\n  WHERE required_role_tier = ANY (ARRAY(SELECT jsonb_array_elements_text(c.j->'rbacContext'->'allowedTiers')))\n  ORDER BY CASE WHEN chunk_content ILIKE '%' || (c.j->>'message') || '%' THEN 0 ELSE 1 END, created_at DESC\n  LIMIT 1\n) k ON TRUE;",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json) }}"
         }
       },
-      "id": "e9a10001-0009-4000-8000-000000000009",
-      "name": "IF_SufficientLeaveBalance",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 1,
+      "id": "3aa5a032-3a09-4154-98d4-f7492ec33c15",
+      "name": "DB_Knowledge_RBAC_Search",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
       "position": [
-        1580,
-        260
+        0,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "g2oiNXpDsEzXYhzU",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const row=$input.item.json; const ctx=row.context||{}; const k=row.knowledge_row;\nlet result;\nif (!k) result={status:'NO_AUTHORIZED_KNOWLEDGE_FOUND',groundedAnswer:'I could not find an authorized knowledge-base entry for this request.'};\nelse result={status:'SUCCESS',documentTitle:k.document_title,sectionTitle:k.section_title,requiredRoleTier:k.required_role_tier,groundedAnswer:`${k.chunk_content}\\n\\n**Source:** ${k.document_title} | ${k.section_title}`};\nreturn {json:{...ctx,toolExecution:{toolName:'query_knowledge_base',result,executedAt:new Date().toISOString()}}};"
+      },
+      "id": "164deb40-8f08-44ee-95f8-c8251d8dddca",
+      "name": "Build_Knowledge_Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Phase 8: Manager Human Approval Gate (Slack / Form Simulation)\nconst item = $input.item.json;\nconst leave = item.leaveCalculation;\nconst user = item.authenticatedUser;\nconst managerAction = item.managerApprovalAction || \"APPROVE\";\n\nconst requestId = `LEAVE-REQ-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;\n\nlet finalStatus = \"\";\nlet updatedBalance = user.annualLeaveBalance;\nlet responseMessage = \"\";\n\nif (managerAction === \"APPROVE\") {\n  finalStatus = \"APPROVED\";\n  updatedBalance = user.annualLeaveBalance - leave.requestedDays;\n  responseMessage = `Your leave request for ${leave.requestedDays} business days (${leave.startDate} to ${leave.endDate}) has been APPROVED by your manager (${user.managerEmail}). Your updated annual leave balance is now ${updatedBalance} days.`;\n} else {\n  finalStatus = \"REJECTED\";\n  responseMessage = `Your leave request for ${leave.requestedDays} business days was REJECTED by your manager (${user.managerEmail}). Your annual leave balance remains ${user.annualLeaveBalance} days.`;\n}\n\nreturn {\n  json: {\n    ...item,\n    toolExecution: {\n      toolName: \"submit_leave_request\",\n      result: {\n        requestId: requestId,\n        status: finalStatus,\n        managerEmail: user.managerEmail,\n        deductedDays: managerAction === \"APPROVE\" ? leave.requestedDays : 0,\n        newBalance: updatedBalance,\n        groundedAnswer: responseMessage\n      },\n      executedAt: new Date().toISOString()\n    }\n  }\n};"
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item=$input.item.json; const m=item.message||''; const dm=m.match(/(\\d+)\\s*days?/i); const days=dm?parseInt(dm[1],10):1;\nconst start=item.startDate||'2026-11-23'; const end=item.endDate||start;\nreturn {json:{...item,leaveInput:{days,startDate:start,endDate:end,reason:m,approvalAction:item.managerApprovalAction||'PENDING'}}};"
       },
-      "id": "e9a10001-0010-4000-8000-000000000010",
-      "name": "Phase8_ManagerApprovalGate",
+      "id": "9745be4c-6f65-40af-b3a3-3d6747720929",
+      "name": "Prepare_Leave_Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1820,
-        200
+        0,
+        192
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Insufficient Leave Balance Rejection Notice\nconst item = $input.item.json;\nconst leave = item.leaveCalculation;\nconst user = item.authenticatedUser;\n\nreturn {\n  json: {\n    ...item,\n    toolExecution: {\n      toolName: \"submit_leave_request\",\n      result: {\n        status: \"DECLINED_INSUFFICIENT_BALANCE\",\n        requestedDays: leave.requestedDays,\n        currentBalance: user.annualLeaveBalance,\n        groundedAnswer: `Leave Request Failed: You requested ${leave.requestedDays} days of leave, but your current annual leave balance is only ${user.annualLeaveBalance} days. Please adjust your dates or contact HR Operations.`\n      },\n      executedAt: new Date().toISOString()\n    }\n  }\n};"
+        "operation": "executeQuery",
+        "query": "WITH d AS (SELECT $1::jsonb AS j), u AS (\n SELECT eu.user_id, eu.annual_leave_balance FROM public.enterprise_users eu, d WHERE eu.user_id=d.j->>'userId'\n), ins AS (\n INSERT INTO public.employee_leave_requests (user_id,start_date,end_date,days_count,reason,status)\n SELECT u.user_id, (d.j->'leaveInput'->>'startDate')::date, (d.j->'leaveInput'->>'endDate')::date,\n        (d.j->'leaveInput'->>'days')::int, COALESCE(d.j->'leaveInput'->>'reason','Leave request'), 'PENDING_APPROVAL'\n FROM u,d WHERE u.annual_leave_balance >= (d.j->'leaveInput'->>'days')::int\n RETURNING request_id,user_id,start_date,end_date,days_count,status\n)\nSELECT d.j AS context, to_jsonb(u) AS user_row, to_jsonb(ins) AS leave_row\nFROM d LEFT JOIN u ON TRUE LEFT JOIN ins ON TRUE;",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json) }}"
+        }
       },
-      "id": "e9a10001-0011-4000-8000-000000000011",
-      "name": "Phase4_RejectInsufficientLeave",
+      "id": "4fd29bad-b237-4204-888f-753d478c0f7f",
+      "name": "DB_Leave_Check_And_Create_Pending",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        192
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "g2oiNXpDsEzXYhzU",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const row=$input.item.json; const ctx=row.context||{}; const u=row.user_row; const req=row.leave_row;\nlet result;\nif (!u) result={status:'USER_NOT_FOUND',groundedAnswer:'Employee record was not found.'};\nelse if (!req) result={status:'DECLINED_INSUFFICIENT_BALANCE',currentBalance:u.annual_leave_balance,requestedDays:ctx.leaveInput.days,groundedAnswer:`Insufficient leave balance. Available: ${u.annual_leave_balance}; requested: ${ctx.leaveInput.days}.`};\nelse result={status:'PENDING_APPROVAL',requestId:req.request_id,requestedDays:req.days_count,groundedAnswer:`Leave request ${req.request_id} was saved as PENDING_APPROVAL. Manager approval is required before leave balance is deducted.`};\nreturn {json:{...ctx,toolExecution:{toolName:'submit_leave_request',result,executedAt:new Date().toISOString()}}};"
+      },
+      "id": "517b764b-205e-4f87-bb86-b8667a710eb4",
+      "name": "Build_Leave_Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1820,
-        320
+        480,
+        192
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Phase 5: Tool 3 - IT Support Ticket Creation\nconst item = $input.item.json;\nconst prompt = item.message || \"\";\nconst user = item.authenticatedUser;\n\nconst ticketId = \"IT-TICK-8841\";\nlet category = \"Network & VPN Services\";\nlet urgency = \"HIGH\";\n\nif (prompt.toLowerCase().includes(\"vpn\") || prompt.toLowerCase().includes(\"789\")) {\n  category = \"GlobalProtect VPN Gateway Timeout\";\n  urgency = \"HIGH\";\n}\n\nreturn {\n  json: {\n    ...item,\n    toolExecution: {\n      toolName: \"create_it_ticket\",\n      result: {\n        ticketId: ticketId,\n        category: category,\n        urgency: urgency,\n        submittedBy: user.userId,\n        status: \"OPEN_ASSIGNED_TO_SECOPS\",\n        groundedAnswer: `IT Ticket #${ticketId} has been successfully created with [${urgency}] priority for category \"${category}\". Our Network Engineering on-call team has been paged. You will receive updates at ${user.email}.`\n      },\n      executedAt: new Date().toISOString()\n    }\n  }\n};"
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item=$input.item.json; const p=(item.message||'').toLowerCase();\nconst urgency=p.includes('down')||p.includes('security')?'CRITICAL':p.includes('cannot')||p.includes('error')||p.includes('vpn')?'HIGH':'MEDIUM';\nreturn {json:{...item,itInput:{ticketId:'IT-TICK-'+Date.now().toString().slice(-8),category:p.includes('vpn')?'VPN':p.includes('laptop')?'Laptop':'General IT Support',description:item.message||'IT support requested',urgency}}};"
       },
-      "id": "e9a10001-0012-4000-8000-000000000012",
-      "name": "Phase5_Tool_CreateITTicket",
+      "id": "d598979f-69e6-4ff8-8666-7c3c6865d3b1",
+      "name": "Prepare_IT_Ticket",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1360,
-        440
+        0,
+        368
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Phase 6: Tool 4 - CRM Client Health Lookup (PostgreSQL Client Ledger Simulation)\nconst item = $input.item.json;\nconst prompt = (item.message || \"\").toLowerCase();\n\nconst crmDirectory = {\n  \"acme\": {\n    clientId: \"CRM-ACME-01\",\n    clientName: \"Acme Corporation\",\n    contractStatus: \"ACTIVE\",\n    activeMRR: 45000.00,\n    renewalDate: \"2027-04-15\",\n    accountManager: \"Vikram Singh\",\n    tier: \"ENTERPRISE_PLATINUM\"\n  },\n  \"globex\": {\n    clientId: \"CRM-GLOBEX-02\",\n    clientName: \"Globex Systems\",\n    contractStatus: \"EXPIRING_SOON\",\n    activeMRR: 18500.00,\n    renewalDate: \"2026-12-31\",\n    accountManager: \"Vikram Singh\",\n    tier: \"ENTERPRISE_GOLD\"\n  }\n};\n\nlet client = crmDirectory[\"acme\"];\nif (prompt.includes(\"globex\")) {\n  client = crmDirectory[\"globex\"];\n}\n\nreturn {\n  json: {\n    ...item,\n    toolExecution: {\n      toolName: \"lookup_crm_client\",\n      result: {\n        ...client,\n        groundedAnswer: `**CRM Account Health:** **${client.clientName}**\\n\u2022 **Status:** ${client.contractStatus}\\n\u2022 **Active MRR:** $${client.activeMRR.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD\\n\u2022 **Next Renewal:** ${client.renewalDate}\\n\u2022 **Account Lead:** ${client.accountManager} (${client.tier})`\n      },\n      executedAt: new Date().toISOString()\n    }\n  }\n};"
+        "operation": "executeQuery",
+        "query": "WITH d AS (SELECT $1::jsonb AS j), ins AS (\n INSERT INTO public.enterprise_it_tickets(ticket_id,submitted_by,issue_category,description,urgency,ticket_status)\n SELECT d.j->'itInput'->>'ticketId', d.j->>'userId', d.j->'itInput'->>'category', d.j->'itInput'->>'description', d.j->'itInput'->>'urgency', 'OPEN'\n FROM d RETURNING ticket_id,issue_category,urgency,ticket_status\n) SELECT d.j AS context, to_jsonb(ins) AS ticket_row FROM d,ins;",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json) }}"
+        }
       },
-      "id": "e9a10001-0013-4000-8000-000000000013",
-      "name": "Phase6_Tool_CRMLookup",
+      "id": "a668728e-84c9-4fab-b9e1-924d0f5d7576",
+      "name": "DB_Create_IT_Ticket",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        368
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "g2oiNXpDsEzXYhzU",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const row=$input.item.json; const ctx=row.context||{}; const t=row.ticket_row||{};\nreturn {json:{...ctx,toolExecution:{toolName:'create_it_ticket',result:{...t,status:t.ticket_status||'OPEN',groundedAnswer:`IT ticket ${t.ticket_id||''} was created with ${t.urgency||''} priority. Status: ${t.ticket_status||'OPEN'}.`},executedAt:new Date().toISOString()}}};"
+      },
+      "id": "b1509ae9-38dd-466e-8d6c-0d2cf2845520",
+      "name": "Build_IT_Ticket_Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1360,
-        600
+        480,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item=$input.item.json; const p=item.message||''; const m=p.match(/(?:for|of|about)\\s+([A-Za-z0-9 &.-]+?)(?:,|\\s+including|$)/i); const lookupName=(m?m[1]:p).replace(/\\b(crm|client|account|health|details|contract|status|check|please|the|and|including|active|mrr|renewal|date|manager)\\b/ig,' ').trim()||'Acme';\nreturn {json:{...item,crmInput:{lookupName}}};"
+      },
+      "id": "92741e0f-8449-4f5a-b2c9-be1799df5b88",
+      "name": "Prepare_CRM_Lookup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH d AS (SELECT $1::jsonb AS j)\nSELECT d.j AS context, to_jsonb(c) AS client_row\nFROM d LEFT JOIN LATERAL (\n SELECT client_id,client_name,contract_status,active_mrr,renewal_date,account_manager,tier\n FROM public.enterprise_crm_clients\n WHERE client_name ILIKE '%' || (d.j->'crmInput'->>'lookupName') || '%'\n ORDER BY client_name LIMIT 1\n) c ON TRUE;",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json) }}"
+        }
+      },
+      "id": "ac61b28d-830c-447b-a82b-99b09aa56008",
+      "name": "DB_CRM_Client_Lookup",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        544
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "g2oiNXpDsEzXYhzU",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const row=$input.item.json; const ctx=row.context||{}; const c=row.client_row;\nconst result=c?{...c,groundedAnswer:`**CRM Account Health: ${c.client_name}**\\n- Status: ${c.contract_status}\\n- Active MRR: ${c.active_mrr}\\n- Renewal: ${c.renewal_date}\\n- Account manager: ${c.account_manager}`}:{status:'NOT_FOUND',groundedAnswer:`No CRM client matched ${ctx.crmInput?.lookupName||'your search'}.`};\nreturn {json:{...ctx,toolExecution:{toolName:'lookup_crm_client',result,executedAt:new Date().toISOString()}}};"
+      },
+      "id": "c06d3358-7451-4662-a97b-ddb9a077b9e3",
+      "name": "Build_CRM_Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        544
       ]
     },
     {
@@ -271,39 +391,94 @@
         "url": "https://httpbin.org/post",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"channel\": \"{{ $json.channel }}\",\n  \"userId\": \"{{ $json.userId }}\",\n  \"responseMarkdown\": \"{{ $json.toolExecution.result.groundedAnswer }}\",\n  \"dispatchedAt\": \"{{ new Date().toISOString() }}\"\n}",
+        "jsonBody": "={{ ({ channel: $json.channel || 'SLACK_DIRECT', userId: $json.userId, responseMarkdown: $json.toolExecution.result.groundedAnswer || 'Request processed.', dispatchedAt: new Date().toISOString(), auditContext: $json }) }}",
         "options": {}
       },
-      "id": "e9a10001-0014-4000-8000-000000000014",
-      "name": "Phase9_DispatchSlackTeamsResponse",
+      "id": "4046de5f-7aa2-4eff-ae25-8ac82fe712f0",
+      "name": "Phase9_Dispatch_Test_HTTPBin",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2120,
-        360
+        768,
+        288
       ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Phase 10: Persist Full Agent Execution & Audit Telemetry in PostgreSQL\nconst item = $input.item.json;\nconst user = item.authenticatedUser;\nconst tool = item.toolExecution;\n\nconst auditRecord = {\n  auditId: `AUDIT-UUID-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,\n  userId: user.userId,\n  userRole: user.role,\n  userPrompt: item.message,\n  toolsInvoked: [\n    {\n      toolName: tool.toolName,\n      status: tool.result.status || tool.result.rbacStatus || \"SUCCESS\",\n      executedAt: tool.executedAt\n    }\n  ],\n  agentResponse: tool.result.groundedAnswer,\n  latencyMs: Math.floor(Math.random() * 80) + 120,\n  targetPostgresTable: \"agent_execution_audit\",\n  persistedAt: new Date().toISOString()\n};\n\nreturn {\n  json: {\n    finalDeliveryStatus: \"CONVERSATION_DELIVERED_AND_AUDITED\",\n    auditLedgerEntry: auditRecord,\n    chatResponse: tool.result.groundedAnswer\n  }\n};"
+        "mode": "runOnceForEachItem",
+        "jsCode": "const response=$input.item.json||{}; const payload=response.json||{}; const ctx=payload.auditContext||{}; const user=ctx.authenticatedUser||{}; const tool=ctx.toolExecution||{}; const result=tool.result||{};\nconst start=Date.parse(ctx.timestamp||''); const latencyMs=Number.isFinite(start)?Math.max(0,Date.now()-start):0;\nconst audit={userId:user.userId||ctx.userId||payload.userId||null,userPrompt:ctx.message||'',toolsInvoked:{toolName:tool.toolName||'UNKNOWN',status:result.status||result.rbacStatus||'SUCCESS',executedAt:tool.executedAt||null},agentResponse:payload.responseMarkdown||result.groundedAnswer||'',latencyMs};\nreturn {json:{auditLedgerEntry:audit,chatResponse:audit.agentResponse,finalDeliveryStatus:'RESPONSE_DISPATCHED_AUDIT_PENDING'}};"
       },
-      "id": "e9a10001-0015-4000-8000-000000000015",
-      "name": "Phase10_PersistAuditTelemetry",
+      "id": "dcc6669a-a96d-4efe-8edf-18f5f4a3ef48",
+      "name": "Phase10_Build_Audit_Record",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2360,
-        360
+        1008,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.agent_execution_audit (user_id,user_prompt,tools_invoked,agent_response,latency_ms)\nSELECT NULLIF(d->>'userId',''), COALESCE(d->>'userPrompt',''), d->'toolsInvoked', COALESCE(d->>'agentResponse',''), GREATEST(COALESCE((d->>'latencyMs')::int,0),0)\nFROM (SELECT $1::jsonb AS d) x\nRETURNING audit_id, user_id, latency_ms, created_at;",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json.auditLedgerEntry) }}"
+        }
+      },
+      "id": "50229038-95b8-4434-91d9-2f04424ce893",
+      "name": "DB_Insert_Audit_Telemetry",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1248,
+        288
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "g2oiNXpDsEzXYhzU",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const row=$input.item.json||{}; const audit=$('Phase10_Build_Audit_Record').first().json.auditLedgerEntry;\nreturn {json:{finalDeliveryStatus:'CONVERSATION_DELIVERED_AND_AUDITED',auditLedgerEntry:{...audit,auditId:row.audit_id,createdAt:row.created_at},chatResponse:audit.agentResponse}};"
+      },
+      "id": "2c743b13-310b-4944-98ab-aeb4247d832c",
+      "name": "Final_Audit_Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Project 10 Supabase workflow starter\n1. After import, select your Supabase Postgres credential on every Postgres node.\n2. Seed enterprise_users, enterprise_knowledge and enterprise_crm_clients before testing.\n3. Phase 9 currently uses httpbin.org/post for testing, not Slack/Teams delivery.\n4. Leave requests are inserted as PENDING_APPROVAL. This starter deliberately does not auto-approve or deduct balances; connect a real manager approval callback before updating status/balance.\n5. Knowledge retrieval here is role-filtered SQL retrieval, not vector similarity. Add embeddings + pgvector similarity search to meet the full RAG requirement.\n6. This is a deterministic router scaffold, not a configured OpenAI AI Agent. Add your model and tools for full assessment compliance.",
+        "height": 420,
+        "width": 560,
+        "color": 5
+      },
+      "id": "8eaf3bed-63b5-4659-a9f9-caa45aa74778",
+      "name": "SETUP_README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1456,
+        624
       ]
     }
   ],
+  "pinData": {},
   "connections": {
     "Manual_Trigger": {
       "main": [
         [
           {
-            "node": "Code_StageUserChatRequest",
+            "node": "Normalize_Inbound_Request",
             "type": "main",
             "index": 0
           }
@@ -314,14 +489,25 @@
       "main": [
         [
           {
-            "node": "Code_StageUserChatRequest",
+            "node": "Normalize_Inbound_Request",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code_StageUserChatRequest": {
+    "Normalize_Inbound_Request": {
+      "main": [
+        [
+          {
+            "node": "DB01_Get_Enterprise_User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB01_Get_Enterprise_User": {
       "main": [
         [
           {
@@ -336,14 +522,14 @@
       "main": [
         [
           {
-            "node": "Phase2_AIAgentOrchestrator",
+            "node": "Phase2_Route_Request",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Phase2_AIAgentOrchestrator": {
+    "Phase2_Route_Request": {
       "main": [
         [
           {
@@ -358,123 +544,182 @@
       "main": [
         [
           {
-            "node": "Phase3_Tool_KnowledgeRAG",
+            "node": "DB_Knowledge_RBAC_Search",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Phase4_Tool_LeaveSubmission",
+            "node": "Prepare_Leave_Request",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Phase5_Tool_CreateITTicket",
+            "node": "Prepare_IT_Ticket",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Phase6_Tool_CRMLookup",
+            "node": "Prepare_CRM_Lookup",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Phase3_Tool_KnowledgeRAG": {
+    "DB_Knowledge_RBAC_Search": {
       "main": [
         [
           {
-            "node": "Phase9_DispatchSlackTeamsResponse",
+            "node": "Build_Knowledge_Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Phase4_Tool_LeaveSubmission": {
+    "Build_Knowledge_Response": {
       "main": [
         [
           {
-            "node": "IF_SufficientLeaveBalance",
+            "node": "Phase9_Dispatch_Test_HTTPBin",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IF_SufficientLeaveBalance": {
+    "Prepare_Leave_Request": {
       "main": [
         [
           {
-            "node": "Phase8_ManagerApprovalGate",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Phase4_RejectInsufficientLeave",
+            "node": "DB_Leave_Check_And_Create_Pending",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Phase8_ManagerApprovalGate": {
+    "DB_Leave_Check_And_Create_Pending": {
       "main": [
         [
           {
-            "node": "Phase9_DispatchSlackTeamsResponse",
+            "node": "Build_Leave_Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Phase4_RejectInsufficientLeave": {
+    "Build_Leave_Response": {
       "main": [
         [
           {
-            "node": "Phase9_DispatchSlackTeamsResponse",
+            "node": "Phase9_Dispatch_Test_HTTPBin",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Phase5_Tool_CreateITTicket": {
+    "Prepare_IT_Ticket": {
       "main": [
         [
           {
-            "node": "Phase9_DispatchSlackTeamsResponse",
+            "node": "DB_Create_IT_Ticket",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Phase6_Tool_CRMLookup": {
+    "DB_Create_IT_Ticket": {
       "main": [
         [
           {
-            "node": "Phase9_DispatchSlackTeamsResponse",
+            "node": "Build_IT_Ticket_Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Phase9_DispatchSlackTeamsResponse": {
+    "Build_IT_Ticket_Response": {
       "main": [
         [
           {
-            "node": "Phase10_PersistAuditTelemetry",
+            "node": "Phase9_Dispatch_Test_HTTPBin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare_CRM_Lookup": {
+      "main": [
+        [
+          {
+            "node": "DB_CRM_Client_Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB_CRM_Client_Lookup": {
+      "main": [
+        [
+          {
+            "node": "Build_CRM_Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build_CRM_Response": {
+      "main": [
+        [
+          {
+            "node": "Phase9_Dispatch_Test_HTTPBin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase9_Dispatch_Test_HTTPBin": {
+      "main": [
+        [
+          {
+            "node": "Phase10_Build_Audit_Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase10_Build_Audit_Record": {
+      "main": [
+        [
+          {
+            "node": "DB_Insert_Audit_Telemetry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB_Insert_Audit_Telemetry": {
+      "main": [
+        [
+          {
+            "node": "Final_Audit_Confirmation",
             "type": "main",
             "index": 0
           }
@@ -482,88 +727,16 @@
       ]
     }
   },
-  "pinData": {
-    "Code_StageUserChatRequest": [
-      {
-        "json": {
-          "userId": "USER-EMP-4019",
-          "message": "What is our travel reimbursement policy for domestic flights?",
-          "channel": "SLACK_DIRECT",
-          "timestamp": "2026-11-18T10:00:00.000Z",
-          "managerApprovalAction": "APPROVE"
-        }
-      }
-    ],
-    "Phase1_AuthenticateUserAndRBAC": [
-      {
-        "json": {
-          "userId": "USER-EMP-4019",
-          "message": "What is our travel reimbursement policy for domestic flights?",
-          "channel": "SLACK_DIRECT",
-          "authenticatedUser": {
-            "userId": "USER-EMP-4019",
-            "name": "Kavita Reddy",
-            "email": "kavita.r@enterprise.com",
-            "role": "EMPLOYEE",
-            "department": "Engineering",
-            "managerEmail": "vikram.singh@enterprise.com",
-            "annualLeaveBalance": 14
-          },
-          "rbacContext": {
-            "role": "EMPLOYEE",
-            "department": "Engineering",
-            "allowedTiers": [
-              "EMPLOYEE"
-            ],
-            "sessionToken": "SESSION-SEC-KAVITA-9921",
-            "verifiedAt": "2026-11-18T10:00:01.000Z"
-          }
-        }
-      }
-    ],
-    "Phase3_Tool_KnowledgeRAG": [
-      {
-        "json": {
-          "toolExecution": {
-            "toolName": "query_knowledge_base",
-            "result": {
-              "rbacStatus": "ACCESS_GRANTED_AUTHORIZED",
-              "documentTitle": "Corporate Travel Policy 2026",
-              "sectionTitle": "Domestic Flight Reimbursement",
-              "requiredTier": "EMPLOYEE",
-              "content": "Employees traveling on company business are authorized for economy class commercial domestic flights booked at least 14 days in advance. Meals are reimbursed up to $75 USD per diem with valid itemized receipts. Ground transit via Uber/Lyft is covered for airport transfers and client meetings.",
-              "citation": "Source: SOP-TRAVEL-2026-V2 (Section 4.1)",
-              "groundedAnswer": "Employees traveling on company business are authorized for economy class commercial domestic flights booked at least 14 days in advance. Meals are reimbursed up to $75 USD per diem with valid itemized receipts. Ground transit via Uber/Lyft is covered for airport transfers and client meetings.\\n\\n**Verified Reference:** Source: SOP-TRAVEL-2026-V2 (Section 4.1)"
-            },
-            "executedAt": "2026-11-18T10:00:02.100Z"
-          }
-        }
-      }
-    ],
-    "Phase10_PersistAuditTelemetry": [
-      {
-        "json": {
-          "finalDeliveryStatus": "CONVERSATION_DELIVERED_AND_AUDITED",
-          "auditLedgerEntry": {
-            "auditId": "AUDIT-UUID-TC01-7721",
-            "userId": "USER-EMP-4019",
-            "userRole": "EMPLOYEE",
-            "userPrompt": "What is our travel reimbursement policy for domestic flights?",
-            "toolsInvoked": [
-              {
-                "toolName": "query_knowledge_base",
-                "status": "ACCESS_GRANTED_AUTHORIZED",
-                "executedAt": "2026-11-18T10:00:02.100Z"
-              }
-            ],
-            "agentResponse": "Employees traveling on company business are authorized for economy class commercial domestic flights booked at least 14 days in advance. Meals are reimbursed up to $75 USD per diem with valid itemized receipts. Ground transit via Uber/Lyft is covered for airport transfers and client meetings.\\n\\n**Verified Reference:** Source: SOP-TRAVEL-2026-V2 (Section 4.1)",
-            "latencyMs": 142,
-            "targetPostgresTable": "agent_execution_audit",
-            "persistedAt": "2026-11-18T10:00:03.000Z"
-          },
-          "chatResponse": "Employees traveling on company business are authorized for economy class commercial domestic flights booked at least 14 days in advance. Meals are reimbursed up to $75 USD per diem with valid itemized receipts. Ground transit via Uber/Lyft is covered for airport transfers and client meetings.\\n\\n**Verified Reference:** Source: SOP-TRAVEL-2026-V2 (Section 4.1)"
-        }
-      }
-    ]
-  }
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "bb179193-ea32-4a05-9807-24115c5eb5d7",
+  "meta": {
+    "instanceId": "a03c7678428ef19ededbf912f16f7d5798ec7b9ab4c17f2a2def6a9e791e7215"
+  },
+  "nodeGroups": [],
+  "id": "Q63IvcYufhokjDCg",
+  "tags": []
 }
